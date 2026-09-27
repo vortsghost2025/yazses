@@ -16,6 +16,20 @@ class _Boom:
     def inject_backspaces(self, count):
         raise RuntimeError("primary failed")
 
+
+class _SequenceRecorder:
+    def __init__(self):
+        self.sequences = []
+
+    def inject(self, text):
+        pass
+
+    def inject_backspaces(self, count):
+        pass
+
+    def inject_key_sequence(self, keys):
+        self.sequences.append(keys)
+
 # ---- [injection] fallback_to_clipboard was documented and read by nothing -----
 
 
@@ -35,6 +49,30 @@ def test_the_fallback_can_be_turned_off(monkeypatch):
     assert off._fallback is None
     with pytest.raises(RuntimeError):
         off.inject("hello")  # must surface, not silently paste
+
+
+def test_explicit_primary_receives_key_sequences(monkeypatch):
+    primary = _SequenceRecorder()
+    monkeypatch.setenv("YAZSES_INJECTOR", "unicode")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    monkeypatch.setattr("yazses.platform.linux.injector.get_injector", lambda: primary)
+    monkeypatch.setattr("yazses.platform.linux.injector.shutil.which", lambda _: None)
+
+    LinuxInjector(fallback_to_clipboard=False).inject_key_sequence(["ctrl+z"])
+
+    assert primary.sequences == [["ctrl+z"]]
+
+
+def test_explicit_clipboard_keeps_linux_key_sequence_behavior(monkeypatch):
+    primary = _SequenceRecorder()
+    monkeypatch.setenv("YAZSES_INJECTOR", "clipboard")
+    monkeypatch.setenv("WAYLAND_DISPLAY", "wayland-0")
+    monkeypatch.setattr("yazses.platform.linux.injector.get_injector", lambda: primary)
+    monkeypatch.setattr("yazses.platform.linux.injector.shutil.which", lambda _: None)
+
+    LinuxInjector(fallback_to_clipboard=False).inject_key_sequence(["ctrl+z"])
+
+    assert primary.sequences == []
 
 
 def test_the_fallback_is_on_by_default(monkeypatch):
